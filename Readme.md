@@ -43,6 +43,7 @@ eBGP adjacencies are shown in detail below:
 - The outcome of the lab will be full transit between all ends (all VMs can reach each other)
 - BGP: The On-prem network's ASN is assigned to 65521. Azure Route Server currently uses ASN 65515, and the [ASN cannot be changed](https://docs.microsoft.com/en-us/azure/route-server/troubleshoot-route-server#why-does-my-nva-not-receive-routes-from-azure-route-server-even-though-the-bgp-peering-is-up). In order to avoid needing to force eBGP peers to learn certain routes from the same AS they use, the Azure VPN Gateway's ASN is configured as 64515.
 
+## Using the lab
 ### Deploy the lab
 
 It is strongly recommended to download the entire lab's contents to a folder where you'll be doing the deployment. All dependencies assume you are in that folder as the current working directory. Once the environment is deployed there is a manual step required to configure the Palo Alto Firewalls using generated config XML files.
@@ -660,10 +661,12 @@ az group delete --name $localSite_rg --force-deletion-types Microsoft.Compute/vi
 az group delete --name $cloudSite_rg --force-deletion-types Microsoft.Compute/virtualMachines --no-wait
 ```
 
-Thanks to:
-* https://github.com/jwrightazure/lab/tree/master/pan-vpn-to-azurevpngw-ikev2-bgp
-* https://github.com/jwrightazure/lab/tree/master/PAN-BGP-ARS
-* https://github.com/jwrightazure/lab/tree/master/VWAN-InternetAccess-Spoke-PaloAlto
+## Thanks
+Thanks are owed to the many labs I've studied to help put this together. Not an exhaustive list, but these include:
+* [dmauser/azure-vm-net-tools](https://github.com/dmauser/azure-vm-net-tools)
+* [jwrightazure/lab/pan-vpn-to-azurevpngw-ikev2-bgp](https://github.com/jwrightazure/lab/tree/main/pan-vpn-to-azurevpngw-ikev2-bgp)
+* [jwrightazure/lab/PAN-BGP-ARS](https://github.com/jwrightazure/lab/tree/main/PAN-BGP-ARS)
+* [jwrightazure/lab/VWAN-InternetAccess-Spoke-PaloAlto](https://github.com/jwrightazure/lab/tree/main/VWAN-InternetAccess-Spoke-PaloAlto)
 
 ## FAQ
 
