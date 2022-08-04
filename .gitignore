@@ -1,0 +1,9 @@
+# Ignore Visio files
+*.vsd
+*.vsdx
+
+# Ignore generated PAN XML Files
+*-import.xml
+
+# Ignore temp files
+~*

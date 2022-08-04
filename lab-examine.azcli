@@ -50,14 +50,14 @@ echo -e "*** $localSite_rg/$rsname Route Server peerings: ***"
 az network routeserver peering list --routeserver $rsname --resource-group $localSite_rg --query '[].{name:name,peerIp:peerIp,asn:Asn}' --output table
 echo -e ""
 
-# Clean this up -- Json Output from route server instances isn't friendly, and isn't formatted to work for table views by default
 for peer in ${rspeerings[@]}; do
-    echo -e "** $localSite_rg/$rsname/$peer advertised routes: **"
-    az network routeserver peering list-advertised-routes --name $peer --resource-group $localSite_rg --routeserver $rsname 
+    echo -e "*** $localSite_rg/$rsname/$peer advertised routes: **"
+    az network routeserver peering list-advertised-routes --name $peer --resource-group $localSite_rg --routeserver $rsname --query "[RouteServiceRole_IN_0,RouteServiceRole_IN_1][]" --output table
     echo -e ""
 
-    echo -e "** $localSite_rg/$rsname/$peer learned routes: **"
-    az network routeserver peering list-learned-routes --name $peer --resource-group $localSite_rg --routeserver $rsname
+    echo -e "*** $localSite_rg/$rsname/$peer learned routes: **"
+    az network routeserver peering list-learned-routes --name $peer --resource-group $localSite_rg --routeserver $rsname --query "[RouteServiceRole_IN_0,RouteServiceRole_IN_1][]" --output table
+    echo -e ""
 done
 
 # Dump VPN Gateway learned routes
@@ -86,39 +86,52 @@ done
 localVmIds=$( az vm list --resource-group $localSite_rg --query "[?plan.publisher!='paloaltonetworks'].id" --output tsv )
 cloudVmIds=$( az vm list --resource-group $cloudSite_rg --query "[?plan.publisher!='paloaltonetworks'].id" --output tsv )
 
-# Local->Cloud will return result Unknown
+# Local VM->Cloud VM will return result Unknown
 # Skip
 
-# Cloud->Local should work
+# Cloud VM->Local VM should work
 for vmid_source in ${cloudVmIds[@]}; do 
     for vmid_dest in ${localVmIds[@]}; do
         if [ "$vmid_source" != "$vmid_dest" ]; then
             echo -e "*** Testing connectivity from ${vmid_source##*/} to ${vmid_dest##*/} ***"
-            az network watcher test-connectivity --source-resource $vmid_source --dest-resource $vmid_dest --protocol icmp -o table
+            az network watcher test-connectivity --source-resource $vmid_source --dest-resource $vmid_dest --protocol icmp --output table
             echo -e ""
         fi
     done
 done
 
-# Local->Local should work
+# Local VM->Local VM should work
 for vmid_source in ${localVmIds[@]}; do 
     for vmid_dest in ${localVmIds[@]}; do
         if [ "$vmid_source" != "$vmid_dest" ]; then
             echo -e "*** Testing connectivity from ${vmid_source##*/} to ${vmid_dest##*/} ***"
-            az network watcher test-connectivity --source-resource $vmid_source --dest-resource $vmid_dest --protocol icmp -o table
+            az network watcher test-connectivity --source-resource $vmid_source --dest-resource $vmid_dest --protocol icmp --output table
             echo -e ""
         fi
     done
 done
 
-# Cloud->Cloud should work
+# Cloud VM->Cloud VM should work
 for vmid_source in ${cloudVmIds[@]}; do 
     for vmid_dest in ${cloudVmIds[@]}; do
         if [ "$vmid_source" != "$vmid_dest" ]; then
             echo -e "*** Testing connectivity from ${vmid_source##*/} to ${vmid_dest##*/} ***"
-            az network watcher test-connectivity --source-resource $vmid_source --dest-resource $vmid_dest --protocol icmp -o table
+            az network watcher test-connectivity --source-resource $vmid_source --dest-resource $vmid_dest --protocol icmp --output table
             echo -e ""
         fi
     done
 done
 
+# Test connectivity of local VMs to a web address
+for vmid_source in ${localVmIds[@]}; do 
+    echo -e "*** Testing connectivity from ${vmid_source##*/} to web address https://www.bing.com ***"
+    az network watcher test-connectivity --source-resource $vmid_source --dest-address 'https://www.bing.com' --protocol tcp --dest-port 443 --output table
+    echo -e ""
+done
+
+# Test connectivity of cloud VMs to a web address
+for vmid_source in ${cloudVmIds[@]}; do 
+    echo -e "*** Testing connectivity from ${vmid_source##*/} to web address https://www.bing.com ***"
+    az network watcher test-connectivity --source-resource $vmid_source --dest-address 'https://www.bing.com' --protocol tcp --dest-port 443 --output table
+    echo -e ""
+done
