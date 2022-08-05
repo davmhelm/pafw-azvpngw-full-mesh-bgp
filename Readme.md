@@ -506,6 +506,14 @@ echo -e "*** $(date +%T%z) Automated deployment complete."
 # See lab-examine.azcli for tests to validate environment
 ```
 
+### Applying firewall configs
+Below is a video that demonstrates the steps of:
+1. signing into the HTTPS managment page of a Palo Alto firewall,
+2. Importing, loading, and committing the generated config.xml file, and
+3. Checking the status of VPN tunnels and BGP routes after the configuration is applied
+
+https://user-images.githubusercontent.com/21045679/183094641-4545549a-3245-4a76-ad88-fd79929bd53d.mp4
+
 ## Test Connectivity
 
 The [lab-examine](./lab-examine.azcli) script contains commands to check the effective routes on the deployed VMs, along with BGP routes advertised by/learned by the Route Server and VPN Gateway. There are also commands to test ICMP connectivity between VMs using Azure Network Watcher. 
