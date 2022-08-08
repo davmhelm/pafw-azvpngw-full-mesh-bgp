@@ -20,6 +20,11 @@ autoshutdown_tz='UTC'
 
 # Your current public IP, needed for remote web administration of Palo Alto Firewalls
 mypip=$( curl -4 'https://api.ipify.org' -s )
+if [ -v ACC_CLOUD ]; then
+    echo -e "*** Detected running in Cloud Shell"
+    echo -e "*** ACTION REQUIRED: Please go to 'https://ipify.org' in a local browser window and enter the result below."
+    read -p "mypip: " mypip 
+fi
 
 # Define "on-prem" network environment
 localSite_rg=PANBgpVpnLab-local-rg
