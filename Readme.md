@@ -689,6 +689,7 @@ Couple of reasons:
             * [PAN KB: How to configure BGP route filtering](https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClDuCAK)
             * [PAN KB: How to import/export a default route using BGP](https://knowledgebase.paloaltonetworks.com/kcSArticleDetail?id=kA10g000000CltU)
     * As of this writeup there is no way to protect the AzureBastionSubnet from learning routes that would impede its functionality/put it into an unsupported state.
+
 ### Why do we need to change the ASN away from the default on the Azure VPN Gateway (65515)?
 - In some circumstances it's normal for eBGP peers to receive route advertisements with an [AS Path](https://datatracker.ietf.org/doc/html/rfc4271#section-5.1.2) containing their own ASN, and during [Phase 2 of the Decision Process](https://datatracker.ietf.org/doc/html/rfc4271#section-9.1.2) make their own decision on whether to incorporate the routes in their [Routing Information Base (RIB)](https://en.wikipedia.org/wiki/Routing_table). 
 - Though it is beyond the scope of this document: with Palo Alto Firewalls, there is an optional feature enabled that causes the sender to detect the loop pre-emptively and not send over the route at all. More info:
