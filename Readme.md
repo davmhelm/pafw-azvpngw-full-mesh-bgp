@@ -85,6 +85,11 @@ autoshutdown_tz='UTC'
 
 # Your current public IP, needed for remote web administration of Palo Alto Firewalls
 mypip=$( curl -4 'https://api.ipify.org' -s )
+if [ -v ACC_CLOUD ]; then
+    echo -e "*** Detected running in Cloud Shell"
+    echo -e "*** ACTION REQUIRED: Please go to 'https://api.ipify.org' in a local browser window and enter the result below."
+    read -p "mypip: " mypip 
+fi
 
 # Define "on-prem" network environment
 localSite_rg=PANBgpVpnLab-local-rg
@@ -126,7 +131,7 @@ localSite_fw2_staticIp_mgmt=10.0.0.5
 localSite_fw2_staticIp_untrust=10.0.1.5
 localSite_fw2_staticIp_trust=10.0.2.5
 localSite_fw2_staticIp_tunnel1=10.0.2.66 # not expected to be routable outside of PAFW
-localSite_fw2_staticIp_tunnel2=10.0.2.65 # not expected to be routable outside of PAFW
+localSite_fw2_staticIp_tunnel2=10.0.2.67 # not expected to be routable outside of PAFW
 localSite_fw2_staticIp_loopback=10.0.2.129 # not expected to be routable outside of PAFW
 
 # Define "on-prem" firewall load balancer
