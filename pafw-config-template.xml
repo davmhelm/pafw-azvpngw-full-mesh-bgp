@@ -1071,7 +1071,7 @@
             <hostname-type-in-syslog>FQDN</hostname-type-in-syslog>
             <initcfg>
               <hostname>_my_hostname_</hostname>
-              <username>davhelm</username>
+              <username>azureuser</username>
               <type>
                 <dhcp-client>
                   <send-hostname>yes</send-hostname>
