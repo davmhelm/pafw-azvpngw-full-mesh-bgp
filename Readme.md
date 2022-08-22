@@ -186,6 +186,15 @@ storage_prefix=diagstorage
 ## Begin Deployment ##
 ######################
 
+# Generate random suffixes
+lowerbound=10000
+upperbound=9999999999
+range=$(($upperbound-$lowerbound+1))
+rand1=$(($(($(($RANDOM**2+$RANDOM))%$range))+$lowerbound))
+rand2=$(($(($(($RANDOM**2+$RANDOM))%$range))+$lowerbound))
+localSite_storageAccount_name=$storage_prefix$rand1
+cloudSite_storageAccount_name=$storage_prefix$rand2
+
 # 1. Create Local Environment 
 # 1.1 Resource Group
 echo -e "*** $(date +%T%z) Creating local site - resource group $localSite_rg in $localSite_region"
@@ -234,6 +243,10 @@ az network lb address-pool create --name backendpool --resource-group $localSite
 az network lb probe create --name myHealthProbe --resource-group $localSite_rg --lb-name $localSite_lb_name --protocol tcp --port 22 --output none
 az network lb rule create --name myHaPortsRule --resource-group $localSite_rg --lb-name $localSite_lb_name --protocol All --frontend-port 0 --backend-port 0 --backend-pool-name backendpool --probe-name myHealthProbe --output none
 
+# Create storage account for VM Diagnostics serial console
+echo -e "*** $(date +%T%z) Creating local site - boot diagnostics storage account in $localSite_region"
+localSite_storageUri=$( az storage account create --name $localSite_storageAccount_name --resource-group $localSite_rg --location $localSite_region --kind StorageV2 --sku Standard_LRS --query "primaryEndpoints.blob" --output tsv )
+
 # 1.3 Deploy Palo Alto Firewalls
 echo -e "*** $(date +%T%z) Creating local site - Palo Alto Firewalls in $localSite_region"
 az vm image terms accept --urn paloaltonetworks:vmseries-flex:byol:latest --output none
@@ -253,8 +266,8 @@ az network nic create --name $localSite_fw2_name-eth1-untrust-nic --resource-gro
 az network nic create --name $localSite_fw2_name-eth2-trust-nic --resource-group $localSite_rg --vnet-name $localSite_vnet_name --subnet PA-Trust-Subnet --private-ip-address $localSite_fw2_staticIp_trust --ip-forwarding true --lb-name $localSite_lb_name --lb-address-pools backendpool --output none
 
 # Create NVA VMs
-az vm create --name $localSite_fw1_name --resource-group $localSite_rg --size $localSite_fw1_size --nics $localSite_fw1_name-eth0-mgmt-nic $localSite_fw1_name-eth1-untrust-nic $localSite_fw1_name-eth2-trust-nic --image paloaltonetworks:vmseries-flex:byol:latest --admin-username $vm_username --admin-password $vm_password --no-wait --output none
-az vm create --name $localSite_fw2_name --resource-group $localSite_rg --size $localSite_fw2_size --nics $localSite_fw2_name-eth0-mgmt-nic $localSite_fw2_name-eth1-untrust-nic $localSite_fw2_name-eth2-trust-nic --image paloaltonetworks:vmseries-flex:byol:latest --admin-username $vm_username --admin-password $vm_password --no-wait --output none
+az vm create --name $localSite_fw1_name --resource-group $localSite_rg --size $localSite_fw1_size --nics $localSite_fw1_name-eth0-mgmt-nic $localSite_fw1_name-eth1-untrust-nic $localSite_fw1_name-eth2-trust-nic --image paloaltonetworks:vmseries-flex:byol:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $localSite_storageUri --no-wait --output none
+az vm create --name $localSite_fw2_name --resource-group $localSite_rg --size $localSite_fw2_size --nics $localSite_fw2_name-eth0-mgmt-nic $localSite_fw2_name-eth1-untrust-nic $localSite_fw2_name-eth2-trust-nic --image paloaltonetworks:vmseries-flex:byol:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $localSite_storageUri --no-wait --output none
 
 # 1.4 Deploy client VMs
 echo -e "*** $(date +%T%z) Creating local site - client VMs in $localSite_region"
@@ -264,17 +277,24 @@ az network nic create --name $localSite_vm2_name-nic --resource-group $localSite
 
 # Create VMs
 # az vm image terms accept --urn Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest --output none # not needed, no terms to accept
-az vm create --name $localSite_vm1_name --resource-group $localSite_rg --size $localSite_vm1_size --nics $localSite_vm1_name-nic --image Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest --admin-username $vm_username --admin-password $vm_password --no-wait --output none
-az vm create --name $localSite_vm2_name --resource-group $localSite_rg --size $localSite_vm2_size --nics $localSite_vm2_name-nic --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition-smalldisk:latest --admin-username $vm_username --admin-password $vm_password --no-wait --output none
+az vm create --name $localSite_vm1_name --resource-group $localSite_rg --size $localSite_vm1_size --nics $localSite_vm1_name-nic --image Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $localSite_storageUri --no-wait --output none
+az vm create --name $localSite_vm2_name --resource-group $localSite_rg --size $localSite_vm2_size --nics $localSite_vm2_name-nic --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition-smalldisk:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $localSite_storageUri --no-wait --output none
+
+# Install Extensions on VMs
+# Wait for Linux VM to be ready
+az vm wait --name $localSite_vm1_name --resource-group $localSite_rg --exists --output none
 
 # Install network tools on Linux VM
-az vm extension set --name CustomScript --resource-group $localSite_rg --vm-name $localSite_vm1_name --publisher Microsoft.Azure.Extensions --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/dmauser/azure-vm-net-tools/main/script/nettools.sh\"],\"commandToExecute\": \"./nettools.sh\"}" --no-wait --output none
+az vm extension set --name CustomScript --resource-group $localSite_rg --vm-name $localSite_vm1_name --publisher Microsoft.Azure.Extensions --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/davmhelm/azure-vm-net-tools/main/script/nettools.sh\"],\"commandToExecute\": \"./nettools.sh\"}" --no-wait --output none
 
 # Install Network Watcher Agent on Linux VM for later connectivity testing
 az vm extension set --name NetworkWatcherAgentLinux --resource-group $localSite_rg --vm-name $localSite_vm1_name --publisher Microsoft.Azure.NetworkWatcher --no-wait --output none
 
-# Enable ICMP ping on Windows VM
-az vm extension set --name CustomScriptExtension --resource-group $localSite_rg --vm-name $localSite_vm2_name --publisher Microsoft.Compute --settings '{"commandToExecute": "netsh advfirewall firewall set rule dir=in name=\"File and Printer Sharing (Echo Request - ICMPv4-In)\" new enable=yes && netsh advfirewall firewall set rule dir=in name=\"File and Printer Sharing (Echo Request - ICMPv6-In)\" new enable=yes"}' --no-wait --output none
+# Wait for Windows VM to be ready
+az vm wait --name $localSite_vm2_name --resource-group $localSite_rg --exists --output none
+
+# Install network tools on Windows VM
+az vm extension set --name CustomScriptExtension --resource-group $localSite_rg --vm-name $localSite_vm2_name --publisher Microsoft.Compute --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/davmhelm/azure-vm-net-tools/main/script/nettools.ps1\"],\"commandToExecute\": \"powershell.exe -file ./nettools.ps1\"}" --no-wait --output none
 
 # Install Network Watcher Agent on Windows VM for later connectivity testing
 az vm extension set --name NetworkWatcherAgentWindows --resource-group $localSite_rg --vm-name $localSite_vm2_name --publisher Microsoft.Azure.NetworkWatcher --no-wait --output none
@@ -348,6 +368,10 @@ az network vpn-connection ipsec-policy add --connection-name $localSite_fw2_name
 echo -e "*** $(date +%T%z) Updating local site - network security group for Palo Alto Firewall Untrust interfaces in $localSite_region"
 az network nsg rule create --name AllowTrafficFromAzureVpnGateways --resource-group $localSite_rg --nsg-name PA-Untrust-Subnet-nsg --direction Inbound --priority 100 --protocol Udp --source-address-prefixes $cloudSite_vpngw_publicIp1/32 $cloudSite_vpngw_publicIp2/32 --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 500 4500 --description "Permit incoming IKE traffic" --output none
 
+# Create storage account for VM Diagnostics serial console
+echo -e "*** $(date +%T%z) Creating cloud site - boot diagnostics storage account in $cloudSite_region"
+cloudSite_storageUri=$( az storage account create --name $cloudSite_storageAccount_name --resource-group $cloudSite_rg --location $cloudSite_region --kind StorageV2 --sku Standard_LRS --query "primaryEndpoints.blob" --output tsv )
+
 # 2.4 Deploy client VMs
 echo -e "*** $(date +%T%z) Creating cloud site - client VMs in $cloudSite_region"
 # Create network interfaces
@@ -355,17 +379,24 @@ az network nic create --name $cloudSite_vm1_name-nic --resource-group $cloudSite
 az network nic create --name $cloudSite_vm2_name-nic --resource-group $cloudSite_rg --vnet-name $cloudSite_vnet_spoke2_name --subnet VM-Subnet --private-ip-address $cloudSite_vm2_staticIp --output none
 
 # Create VMs
-az vm create --name $cloudSite_vm1_name --resource-group $cloudSite_rg --size $cloudSite_vm1_size --nics $cloudSite_vm1_name-nic --image Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest --admin-username $vm_username --admin-password $vm_password --no-wait --output none
-az vm create --name $cloudSite_vm2_name --resource-group $cloudSite_rg --size $cloudSite_vm2_size --nics $cloudSite_vm2_name-nic --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition-smalldisk:latest --admin-username $vm_username --admin-password $vm_password --no-wait --output none
+az vm create --name $cloudSite_vm1_name --resource-group $cloudSite_rg --size $cloudSite_vm1_size --nics $cloudSite_vm1_name-nic --image Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $cloudSite_storageUri --no-wait --output none
+az vm create --name $cloudSite_vm2_name --resource-group $cloudSite_rg --size $cloudSite_vm2_size --nics $cloudSite_vm2_name-nic --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition-smalldisk:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $cloudSite_storageUri --no-wait --output none
+
+# Install extensions on VMs
+# Wait for Linux VM to be ready
+az vm wait --name $cloudSite_vm1_name --resource-group $cloudSite_rg --exists --output none
 
 # Install network tools on Linux VM
-az vm extension set --name CustomScript --resource-group $cloudSite_rg --vm-name $cloudSite_vm1_name --publisher Microsoft.Azure.Extensions --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/dmauser/azure-vm-net-tools/main/script/nettools.sh\"],\"commandToExecute\": \"./nettools.sh\"}" --no-wait --output none
+az vm extension set --name CustomScript --resource-group $cloudSite_rg --vm-name $cloudSite_vm1_name --publisher Microsoft.Azure.Extensions --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/davmhelm/azure-vm-net-tools/main/script/nettools.sh\"],\"commandToExecute\": \"./nettools.sh\"}" --no-wait --output none
 
 # Install Network Watcher Agent on Linux VM for later connectivity testing
 az vm extension set --name NetworkWatcherAgentLinux --resource-group $cloudSite_rg --vm-name $cloudSite_vm1_name --publisher Microsoft.Azure.NetworkWatcher --no-wait --output none
 
-# Enable ICMP ping on Windows VM
-az vm extension set --name CustomScriptExtension --resource-group $cloudSite_rg --vm-name $cloudSite_vm2_name --publisher Microsoft.Compute --settings '{"commandToExecute": "netsh advfirewall firewall set rule dir=in name=\"File and Printer Sharing (Echo Request - ICMPv4-In)\" new enable=yes && netsh advfirewall firewall set rule dir=in name=\"File and Printer Sharing (Echo Request - ICMPv6-In)\" new enable=yes"}' --no-wait --output none
+# Wait for Windows VM to be ready
+az vm wait --name $cloudSite_vm2_name --resource-group $cloudSite_rg --exists --output none
+
+# Install network tools on Windows VM
+az vm extension set --name CustomScriptExtension --resource-group $cloudSite_rg --vm-name $cloudSite_vm2_name --publisher Microsoft.Compute --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/davmhelm/azure-vm-net-tools/main/script/nettools.ps1\"],\"commandToExecute\": \"powershell.exe -file ./nettools.ps1\"}" --no-wait --output none
 
 # Install Network Watcher Agent on Windows VM for later connectivity testing
 az vm extension set --name NetworkWatcherAgentWindows --resource-group $cloudSite_rg --vm-name $cloudSite_vm2_name --publisher Microsoft.Azure.NetworkWatcher --no-wait --output none
@@ -388,28 +419,10 @@ bastion_vnet_id=$( az network vnet show --name $cloudSite_vnet_bastion_name --re
 az network vnet peering create --name bastion-to-onprem --resource-group $cloudSite_rg --vnet-name $cloudSite_vnet_bastion_name --remote-vnet $local_vnet_id --allow-forwarded-traffic --allow-vnet-access --output none
 az network vnet peering create --name onprem-to-bastion --resource-group $localSite_rg --vnet-name $localSite_vnet_name --remote-vnet $bastion_vnet_id --allow-forwarded-traffic --allow-vnet-access --output none
 
-# VM Diagnostics for serial console
-# Generate random suffixes
-lowerbound=10000
-upperbound=9999999999
-range=$(($upperbound-$lowerbound+1))
-rand1=$(($(($(($RANDOM**2+$RANDOM))%$range))+$lowerbound))
-rand2=$(($(($(($RANDOM**2+$RANDOM))%$range))+$lowerbound))
-
-# Create storage accounts
-echo -e "*** $(date +%T%z) Creating helper resources - boot diagnostics storage accounts in $localSite_region and $cloudSite_region"
-localSite_storageUri=$( az storage account create --name $storage_prefix$rand1 --resource-group $localSite_rg --location $localSite_region --kind StorageV2 --sku Standard_LRS --query "primaryEndpoints.blob" --output tsv )
-cloudSite_storageUri=$( az storage account create --name $storage_prefix$rand2 --resource-group $cloudSite_rg --location $cloudSite_region --kind StorageV2 --sku Standard_LRS --query "primaryEndpoints.blob" --output tsv )
-
-# Enable boot diagnostics
-echo -e "*** $(date +%T%z) Creating helper resources - enabling boot diagnostics for VMs in $localSite_rg and $cloudSite_rg"
-localVmIds=$( az vm list --resource-group $localSite_rg --query '[*].id' --output tsv )
-cloudVmIds=$( az vm list --resource-group $cloudSite_rg --query '[*].id' --output tsv )
-az vm boot-diagnostics enable --storage $localSite_storageUri --ids $localVmIds --output none
-az vm boot-diagnostics enable --storage $cloudSite_storageUri --ids $cloudVmIds --output none
-
 # Enable VM auto-shutdown to save on costs
 echo -e "*** $(date +%T%z) Creating helper resources - enabling auto-shutdown schedules for VMs in $localSite_rg and $cloudSite_rg"
+localVmIds=$( az vm list --resource-group $localSite_rg --query '[*].id' --output tsv )
+cloudVmIds=$( az vm list --resource-group $cloudSite_rg --query '[*].id' --output tsv )
 for vm_id in ${localVmIds[@]}; do
     vmName=${vm_id##*/}
     az deployment group create --name deploy-vm-schedule-$vmName --resource-group $localSite_rg --template-file ./autoshutdown.bicep --parameters vmName=$vmName location=$localSite_region targetVmId=$vm_id shutdownTime=$autoshutdown_time timeZone="$autoshutdown_tz" --no-wait --output none
