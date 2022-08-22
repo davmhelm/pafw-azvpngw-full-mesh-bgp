@@ -215,14 +215,21 @@ az network nic create --name $localSite_vm2_name-nic --resource-group $localSite
 az vm create --name $localSite_vm1_name --resource-group $localSite_rg --size $localSite_vm1_size --nics $localSite_vm1_name-nic --image Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $localSite_storageUri --no-wait --output none
 az vm create --name $localSite_vm2_name --resource-group $localSite_rg --size $localSite_vm2_size --nics $localSite_vm2_name-nic --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition-smalldisk:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $localSite_storageUri --no-wait --output none
 
+# Install Extensions on VMs
+# Wait for Linux VM to be ready
+az vm wait --name $localSite_vm1_name --resource-group $localSite_rg --exists --output none
+
 # Install network tools on Linux VM
-az vm extension set --name CustomScript --resource-group $localSite_rg --vm-name $localSite_vm1_name --publisher Microsoft.Azure.Extensions --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/dmauser/azure-vm-net-tools/main/script/nettools.sh\"],\"commandToExecute\": \"./nettools.sh\"}" --no-wait --output none
+az vm extension set --name CustomScript --resource-group $localSite_rg --vm-name $localSite_vm1_name --publisher Microsoft.Azure.Extensions --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/davmhelm/azure-vm-net-tools/main/script/nettools.sh\"],\"commandToExecute\": \"./nettools.sh\"}" --no-wait --output none
 
 # Install Network Watcher Agent on Linux VM for later connectivity testing
 az vm extension set --name NetworkWatcherAgentLinux --resource-group $localSite_rg --vm-name $localSite_vm1_name --publisher Microsoft.Azure.NetworkWatcher --no-wait --output none
 
-# Enable ICMP ping on Windows VM
-az vm extension set --name CustomScriptExtension --resource-group $localSite_rg --vm-name $localSite_vm2_name --publisher Microsoft.Compute --settings '{"commandToExecute": "netsh advfirewall firewall set rule dir=in name=\"File and Printer Sharing (Echo Request - ICMPv4-In)\" new enable=yes && netsh advfirewall firewall set rule dir=in name=\"File and Printer Sharing (Echo Request - ICMPv6-In)\" new enable=yes"}' --no-wait --output none
+# Wait for Windows VM to be ready
+az vm wait --name $localSite_vm2_name --resource-group $localSite_rg --exists --output none
+
+# Install network tools on Windows VM
+az vm extension set --name CustomScriptExtension --resource-group $localSite_rg --vm-name $localSite_vm2_name --publisher Microsoft.Compute --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/davmhelm/azure-vm-net-tools/main/script/nettools.ps1\"],\"commandToExecute\": \"powershell.exe -file ./nettools.ps1\"}" --no-wait --output none
 
 # Install Network Watcher Agent on Windows VM for later connectivity testing
 az vm extension set --name NetworkWatcherAgentWindows --resource-group $localSite_rg --vm-name $localSite_vm2_name --publisher Microsoft.Azure.NetworkWatcher --no-wait --output none
@@ -310,14 +317,21 @@ az network nic create --name $cloudSite_vm2_name-nic --resource-group $cloudSite
 az vm create --name $cloudSite_vm1_name --resource-group $cloudSite_rg --size $cloudSite_vm1_size --nics $cloudSite_vm1_name-nic --image Canonical:0001-com-ubuntu-server-jammy:22_04-lts-gen2:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $cloudSite_storageUri --no-wait --output none
 az vm create --name $cloudSite_vm2_name --resource-group $cloudSite_rg --size $cloudSite_vm2_size --nics $cloudSite_vm2_name-nic --image MicrosoftWindowsServer:WindowsServer:2022-datacenter-azure-edition-smalldisk:latest --admin-username $vm_username --admin-password $vm_password --boot-diagnostics-storage $cloudSite_storageUri --no-wait --output none
 
+# Install extensions on VMs
+# Wait for Linux VM to be ready
+az vm wait --name $cloudSite_vm1_name --resource-group $cloudSite_rg --exists --output none
+
 # Install network tools on Linux VM
-az vm extension set --name CustomScript --resource-group $cloudSite_rg --vm-name $cloudSite_vm1_name --publisher Microsoft.Azure.Extensions --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/dmauser/azure-vm-net-tools/main/script/nettools.sh\"],\"commandToExecute\": \"./nettools.sh\"}" --no-wait --output none
+az vm extension set --name CustomScript --resource-group $cloudSite_rg --vm-name $cloudSite_vm1_name --publisher Microsoft.Azure.Extensions --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/davmhelm/azure-vm-net-tools/main/script/nettools.sh\"],\"commandToExecute\": \"./nettools.sh\"}" --no-wait --output none
 
 # Install Network Watcher Agent on Linux VM for later connectivity testing
 az vm extension set --name NetworkWatcherAgentLinux --resource-group $cloudSite_rg --vm-name $cloudSite_vm1_name --publisher Microsoft.Azure.NetworkWatcher --no-wait --output none
 
-# Enable ICMP ping on Windows VM
-az vm extension set --name CustomScriptExtension --resource-group $cloudSite_rg --vm-name $cloudSite_vm2_name --publisher Microsoft.Compute --settings '{"commandToExecute": "netsh advfirewall firewall set rule dir=in name=\"File and Printer Sharing (Echo Request - ICMPv4-In)\" new enable=yes && netsh advfirewall firewall set rule dir=in name=\"File and Printer Sharing (Echo Request - ICMPv6-In)\" new enable=yes"}' --no-wait --output none
+# Wait for Windows VM to be ready
+az vm wait --name $cloudSite_vm2_name --resource-group $cloudSite_rg --exists --output none
+
+# Install network tools on Windows VM
+az vm extension set --name CustomScriptExtension --resource-group $cloudSite_rg --vm-name $cloudSite_vm2_name --publisher Microsoft.Compute --protected-settings "{\"fileUris\": [\"https://raw.githubusercontent.com/davmhelm/azure-vm-net-tools/main/script/nettools.ps1\"],\"commandToExecute\": \"powershell.exe -file ./nettools.ps1\"}" --no-wait --output none
 
 # Install Network Watcher Agent on Windows VM for later connectivity testing
 az vm extension set --name NetworkWatcherAgentWindows --resource-group $cloudSite_rg --vm-name $cloudSite_vm2_name --publisher Microsoft.Azure.NetworkWatcher --no-wait --output none
